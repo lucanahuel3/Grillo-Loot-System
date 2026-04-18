@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GrilloLootSystem</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════
+   RESET & CSS VARIABLES
+══════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:            #111111;
+  --panel:         #1e1e1e;
+  --border:        #2e2e2e;
+  --border2:       #3a3a3a;
+  --text:          #e8e8e8;
+  --text-dim:      #888;
+  --text-muted:    #4a4a4a;
+  --red:           #e05555;
+  --gold:          #f0a030;
+  --sunday:        #e05555;
+  --accent:        #ffffff;
+  --purple:        #9980cc;
+  --purple-bg:     #1e1a2e;
+  --purple-border: #3a3050;
+  --green:         #5cba5c;
+}
+
+/* ══════════════════════════════════════════════
+   BODY & LAYOUT
+══════════════════════════════════════════════ */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(40,40,60,.3) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(30,30,50,.2) 0%, transparent 50%);
+}
+.app-wrapper { max-width: 1280px; margin: 0 auto; padding: 24px 20px 80px; }
+.app-title   { font-family: 'Cinzel', serif; font-size: 28px; font-weight: 700; letter-spacing: 1px; color: var(--accent); margin-bottom: 24px; }
+.main-grid   { display: grid; grid-template-columns: 300px 1fr 290px; gap: 16px; align-items: start; }
+.left-col, .mid-col, .right-col { display: flex; flex-direction: column; gap: 14px; }
+
+/* ══════════════════════════════════════════════
+   CALENDAR
+══════════════════════════════════════════════ */
+.calendar-widget { background: #fff; border-radius: 12px; padding: 16px; color: #111; }
+.cal-header      { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.cal-title       { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 600; color: #111; text-align: center; flex: 1; }
+.cal-nav         { background: none; border: none; cursor: pointer; color: #444; font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: background .15s; }
+.cal-nav:hover   { background: #eee; }
+.cal-grid        { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+.cal-dow         { text-align: center; font-size: 10px; font-weight: 600; color: #666; padding: 4px 0; letter-spacing: .5px; }
+.cal-dow.weekend { color: var(--sunday); }
+.cal-day         { text-align: center; padding: 5px 2px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: #222; transition: background .15s; border: 2px solid transparent; position: relative; }
+.cal-day:hover:not(.selected) { background: #f0f0f0; }
+.cal-day.other-month    { color: #bbb; }
+.cal-day.sunday,
+.cal-day.saturday       { color: var(--sunday); }
+.cal-day.other-month.sunday,
+.cal-day.other-month.saturday { color: #e0a0a0; }
+.cal-day.selected       { background: #111; color: #fff !important; border-color: #111; }
+.cal-day.today-marker   { box-shadow: inset 0 0 0 1.5px #888; }
+.cal-day.has-session::after {
+  content: ''; position: absolute; bottom: 2px; left: 50%;
+  transform: translateX(-50%); width: 4px; height: 4px;
+  background: var(--gold); border-radius: 50%;
+}
+
+/* ══════════════════════════════════════════════
+   PANELS (generic shell — kept for old selectors)
+══════════════════════════════════════════════ */
+.log-panel, .stat-panel, .drops-panel,
+.fights-header-panel, .fights-list-panel, .history-panel {
+  background: var(--panel); border-radius: 12px;
+  padding: 16px 18px; border: 1px solid var(--border);
+}
+.panel-label, .stat-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px;
+}
+
+/* ══════════════════════════════════════════════
+   LOG TEXTAREA & ACTION BUTTONS
+══════════════════════════════════════════════ */
+textarea {
+  width: 100%; height: 120px; background: #151515;
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-family: 'Rajdhani', sans-serif;
+  font-size: 13px; padding: 10px 12px; resize: vertical;
+  outline: none; transition: border-color .2s;
+}
+textarea:focus        { border-color: #555; }
+textarea::placeholder { color: var(--text-muted); }
+.btn-analyze {
+  width: 100%; margin-top: 10px; padding: 11px;
+  background: #fff; color: #111; border: none; border-radius: 8px;
+  font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: background .15s;
+}
+.btn-analyze:hover { background: #e8e8e8; }
+.btn-clear {
+  width: 100%; margin-top: 6px; padding: 8px;
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 8px;
+  font-family: 'Rajdhani', sans-serif; font-size: 12px;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.btn-clear:hover { border-color: #666; color: var(--text); }
+
+/* ══════════════════════════════════════════════
+   MONEY ROW — SVG coins
+══════════════════════════════════════════════ */
+.money-row  { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.money-item { display: flex; align-items: center; gap: 6px; }
+.money-sep  { color: var(--text-muted); font-size: 18px; }
+.money-val  { font-size: 20px; font-weight: 700; color: var(--text); min-width: 20px; }
+.coin-svg   { width: 28px; height: 28px; flex-shrink: 0; }
+.time-val   { font-size: 18px; font-weight: 600; color: var(--text); }
+
+/* ══════════════════════════════════════════════
+   UNIQUE MOBS
+══════════════════════════════════════════════ */
+.unique-mobs-panel {
+  background: linear-gradient(135deg, var(--purple-bg) 0%, #252030 100%);
+  border-radius: 12px; padding: 14px 20px; border: 1px solid var(--purple-border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.unique-mobs-left  { display: flex; flex-direction: column; gap: 2px; }
+.unique-mobs-label { font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--purple); }
+.unique-mobs-sub   { font-size: 10px; color: #6655aa; letter-spacing: 1px; text-transform: uppercase; }
+.unique-mobs-val   { font-size: 32px; font-weight: 700; color: #c4a8ff; font-family: 'Cinzel', serif; }
+
+/* ══════════════════════════════════════════════
+   DROPS PANEL
+══════════════════════════════════════════════ */
+.drops-title  { font-family: 'Cinzel', serif; font-size: 15px; font-weight: 600; color: var(--accent); margin-bottom: 12px; }
+.drops-search {
+  width: 100%; background: #151515; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 13px;
+  padding: 7px 10px; outline: none; margin-bottom: 10px; transition: border-color .2s;
+}
+.drops-search:focus        { border-color: #555; }
+.drops-search::placeholder { color: var(--text-muted); }
+.drops-list   { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+
+/* shared scrollbar */
+.drops-list::-webkit-scrollbar,
+.fights-list::-webkit-scrollbar,
+.buff-list::-webkit-scrollbar,
+.session-history-list::-webkit-scrollbar { width: 4px; }
+.drops-list::-webkit-scrollbar-thumb,
+.fights-list::-webkit-scrollbar-thumb,
+.buff-list::-webkit-scrollbar-thumb,
+.session-history-list::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+.drop-item, .fight-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 10px; background: #191919; border-radius: 6px; border: 1px solid #272727;
+}
+.drop-name, .fight-mob { color: var(--text); font-size: 13px; }
+.drop-qty               { color: var(--gold); font-weight: 700; font-size: 13px; }
+.fight-count            { color: var(--red);  font-weight: 700; font-size: 12px; }
+.empty-msg              { color: var(--text-muted); font-size: 13px; text-align: center; padding: 28px 0; font-style: italic; }
+
+/* ══════════════════════════════════════════════
+   FIGHTS (right column)
+══════════════════════════════════════════════ */
+.fights-header-panel { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; }
+.fights-label        { font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); }
+.fights-count-badge  { background: #151515; border: 1px solid var(--border); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--text); }
+.fights-list-panel   { min-height: 300px; }
+.fights-list         { overflow-y: auto; max-height: 340px; display: flex; flex-direction: column; gap: 4px; }
+
+/* ══════════════════════════════════════════════
+   CALCULADORA DE DAÑO
+══════════════════════════════════════════════ */
+.dmgcalc-panel {
+  background: var(--panel); border-radius: 12px;
+  padding: 22px 24px; border: 1px solid var(--border); margin-top: 16px;
+}
+.dmgcalc-title { font-family: 'Cinzel', serif; font-size: 17px; font-weight: 600; color: var(--accent); }
+.dmgcalc-sub   { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; margin-bottom: 18px; }
+.dmgcalc-body  { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.dmgcalc-inputs { display: flex; flex-direction: column; gap: 14px; }
+.dmgcalc-field  { display: flex; flex-direction: column; gap: 6px; }
+.dmgcalc-field label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); }
+
+/* The big number input — Google-calculator feel */
+.dmgcalc-number {
+  background: #151515; border: 1px solid var(--border2); border-radius: 10px;
+  color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 32px;
+  font-weight: 700; padding: 12px 16px; outline: none; width: 100%;
+  transition: border-color .2s, box-shadow .2s;
+  -moz-appearance: textfield;
+}
+.dmgcalc-number::-webkit-inner-spin-button,
+.dmgcalc-number::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.dmgcalc-number::placeholder { color: var(--text-muted); font-size: 24px; }
+.dmgcalc-number.min-field:focus { border-color: #4a90d9; box-shadow: 0 0 0 3px rgba(74,144,217,.1); }
+.dmgcalc-number.max-field:focus { border-color: #e05555; box-shadow: 0 0 0 3px rgba(224,85,85,.1); }
+
+/* Results card */
+.dmgcalc-results {
+  background: #151515; border: 1px solid var(--border2); border-radius: 12px;
+  padding: 20px; display: flex; flex-direction: column; gap: 14px;
+}
+.dmgcalc-result-row    { display: flex; flex-direction: column; gap: 3px; }
+.dmgcalc-result-label  { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); }
+.dmgcalc-result-val    { font-family: 'Cinzel', serif; font-size: 36px; font-weight: 700; color: var(--accent); line-height: 1; transition: color .2s; }
+.dmgcalc-result-val.hl { color: #f5c842; }
+.dmgcalc-divider       { border: none; border-top: 1px solid var(--border); }
+.dmgcalc-range-bar     { height: 8px; border-radius: 4px; background: var(--border2); overflow: hidden; position: relative; }
+.dmgcalc-range-fill    {
+  position: absolute; left: 0; top: 0; height: 100%;
+  background: linear-gradient(90deg, #4a90d9 0%, #f5c842 50%, #e05555 100%);
+  border-radius: 4px; transition: width .35s ease;
+}
+.dmgcalc-range-labels  { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: var(--text-muted); }
+
+/* ══════════════════════════════════════════════
+   SESIÓN DIARIA PANEL
+══════════════════════════════════════════════ */
+.session-daily-panel {
+  background: var(--panel); border-radius: 12px;
+  padding: 22px 24px; border: 1px solid var(--border); margin-top: 16px;
+}
+.session-daily-header  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+.session-daily-title   { font-family: 'Cinzel', serif; font-size: 17px; font-weight: 600; color: var(--accent); }
+.session-daily-date    { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; background: #191919; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
+
+/* Tabs */
+.session-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.session-tab  {
+  padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-dim); cursor: pointer;
+  font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase; transition: all .15s;
+}
+.session-tab.active            { background: #fff; color: #111; border-color: #fff; }
+.session-tab:hover:not(.active){ border-color: #555; color: var(--text); }
+.session-tab-content           { display: none; }
+.session-tab-content.visible   { display: block; }
+
+/* Múltiples sesiones en tab "Hoy" */
+.session-day-card {
+  background: #191919; border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; cursor: pointer; transition: border-color .15s;
+  display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px;
+}
+.session-day-card:hover   { border-color: #555; }
+.session-day-card.sdc-active { border-color: var(--gold); }
+.sdc-header { display: flex; align-items: center; gap: 8px; }
+.sdc-num    { font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700; color: var(--text-dim); }
+.sdc-badge  { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+              background: #2a2200; color: var(--gold); border: 1px solid #4a3a00;
+              border-radius: 4px; padding: 2px 7px; }
+.sdc-stats  { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px,1fr)); gap: 8px; }
+
+/* Stat grid */
+.session-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 10px; margin-bottom: 12px; }
+.session-stat-card { background: #191919; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.session-stat-card .s-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); }
+.session-stat-card .s-val   { font-size: 22px; font-weight: 700; font-family: 'Cinzel', serif; color: var(--text); line-height: 1.1; }
+.session-stat-card .s-sub   { font-size: 10px; color: var(--text-muted); }
+.session-hint { font-size: 11px; color: var(--text-muted); text-align: center; padding: 4px 0; }
+
+/* History list (Historial tab) */
+.session-history-list { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
+.session-history-item {
+  background: #191919; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; cursor: pointer; transition: border-color .15s;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.session-history-item:hover     { border-color: #555; }
+.session-history-item.active-day{ border-color: var(--gold); }
+.shi-date  { font-family: 'Cinzel', serif; font-size: 13px; font-weight: 600; color: var(--text-dim); flex-shrink: 0; min-width: 80px; }
+.shi-coins { display: flex; align-items: center; gap: 6px; flex: 1; flex-wrap: wrap; }
+.shi-coin  { display: flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 700; }
+.shi-coin .coin-svg { width: 16px; height: 16px; }
+.shi-meta  { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.shi-del   { background: none; border: 1px solid #333; color: var(--text-muted); border-radius: 4px; padding: 2px 7px; cursor: pointer; font-size: 11px; font-family: 'Rajdhani', sans-serif; transition: all .15s; flex-shrink: 0; }
+.shi-del:hover { border-color: var(--red); color: var(--red); }
+
+/* ══════════════════════════════════════════════
+   BUFFS (Buffs tab)
+══════════════════════════════════════════════ */
+.buff-section { display: flex; flex-direction: column; gap: 12px; }
+.buff-form    {
+  background: #191919; border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+  display: grid; grid-template-columns: 1fr 110px 1fr auto; gap: 8px; align-items: end;
+}
+.buff-field       { display: flex; flex-direction: column; gap: 4px; }
+.buff-field label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); }
+.buff-input {
+  background: #111; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-family: 'Rajdhani', sans-serif; font-size: 13px;
+  padding: 8px 10px; outline: none; transition: border-color .2s; width: 100%;
+}
+.buff-input:focus        { border-color: #555; }
+.buff-input::placeholder { color: var(--text-muted); }
+.btn-add-buff {
+  padding: 9px 16px; background: #1a2e1a; color: var(--green);
+  border: 1px solid #2a4a2a; border-radius: 6px;
+  font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+  transition: all .15s; white-space: nowrap; align-self: end;
+}
+.btn-add-buff:hover { background: #253525; border-color: #3a6a3a; }
+.buff-list    { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.buff-item    {
+  background: #191919; border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center;
+}
+.buff-item-info  { display: flex; flex-direction: column; gap: 2px; }
+.buff-item-name  { font-size: 13px; font-weight: 600; color: var(--text); }
+.buff-item-note  { font-size: 11px; color: var(--text-muted); }
+.buff-item-dmg   { font-size: 13px; font-weight: 700; color: var(--red); white-space: nowrap; padding: 0 6px; }
+.buff-item-del   { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 2px 4px; border-radius: 3px; transition: color .15s; line-height: 1; }
+.buff-item-del:hover { color: var(--red); }
+.buff-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 24px 0; font-style: italic; }
+
+/* ══════════════════════════════════════════════
+   RESUMEN MENSUAL
+══════════════════════════════════════════════ */
+.monthly-panel    { background: var(--panel); border-radius: 12px; padding: 20px 24px; border: 1px solid var(--border); margin-top: 16px; }
+.monthly-title    { font-family: 'Cinzel', serif; font-size: 16px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
+.monthly-subtitle { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px; }
+.monthly-grid     { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; }
+.monthly-card     { background: #191919; border: 1px solid #252525; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; transition: border-color .2s; }
+.monthly-card:hover     { border-color: #444; }
+.monthly-card-title     { font-family: 'Cinzel', serif; font-size: 13px; font-weight: 600; color: var(--text-dim); }
+.monthly-coins          { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.monthly-coin           { display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 700; }
+.monthly-coin .coin-svg { width: 20px; height: 20px; }
+.monthly-coin-sep       { color: var(--text-muted); font-size: 13px; }
+.monthly-meta           { font-size: 11px; color: var(--text-muted); }
+
+/* ══════════════════════════════════════════════
+   MODAL DE CONFIRMACIÓN (analyze log)
+══════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10000; opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.modal-overlay.visible { opacity: 1; pointer-events: all; }
+.modal-box {
+  background: #1e1e1e; border: 1px solid #3a3a3a; border-radius: 14px;
+  padding: 26px 28px; max-width: 440px; width: 90%; display: flex; flex-direction: column; gap: 16px;
+  transform: translateY(12px); transition: transform .2s;
+}
+.modal-overlay.visible .modal-box { transform: translateY(0); }
+.modal-title { font-family: 'Cinzel', serif; font-size: 16px; font-weight: 600; color: var(--accent); }
+.modal-body  { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+.modal-body strong { color: var(--text); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.modal-btn {
+  padding: 8px 18px; border-radius: 7px; border: 1px solid var(--border2);
+  font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s;
+}
+.modal-btn.primary   { background: #fff; color: #111; border-color: #fff; }
+.modal-btn.primary:hover { background: #e8e8e8; }
+.modal-btn.secondary { background: transparent; color: var(--text-dim); }
+.modal-btn.secondary:hover { border-color: #666; color: var(--text); }
+.modal-btn.danger    { background: #2e1a1a; color: var(--red); border-color: #5a2a2a; }
+.modal-btn.danger:hover { background: #3e2020; }
+
+/* ══════════════════════════════════════════════
+   HISTORIAL POR MES — acordeón expandible
+══════════════════════════════════════════════ */
+.month-group { display: flex; flex-direction: column; gap: 0; }
+
+/* Cabecera del mes — clickeable para expandir/contraer */
+.month-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: #191919; border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer; transition: border-color .15s, background .15s;
+  gap: 10px; flex-wrap: wrap; user-select: none;
+}
+.month-group-header:hover { background: #202020; border-color: #444; }
+.month-group-header.expanded { border-radius: 10px 10px 0 0; border-bottom-color: #111; }
+.mgh-left   { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; }
+.mgh-name   { font-family: 'Cinzel', serif; font-size: 13px; font-weight: 600; color: var(--text-dim); }
+.mgh-total-coins { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mgh-coin   { display: flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 700; }
+.mgh-coin .coin-svg { width: 16px; height: 16px; }
+.mgh-sep    { color: var(--text-muted); font-size: 11px; }
+.mgh-meta   { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.mgh-arrow  { font-size: 11px; color: var(--text-muted); transition: transform .2s; flex-shrink: 0; }
+.mgh-arrow.open { transform: rotate(180deg); }
+
+/* Contenedor de sesiones diarias del mes */
+.month-days-container {
+  display: none; flex-direction: column; gap: 0;
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 10px 10px; overflow: hidden;
+}
+.month-days-container.open { display: flex; }
+
+/* Cada sesión diaria dentro del mes */
+.day-session {
+  border-bottom: 1px solid #1a1a1a;
+  background: #161616;
+}
+.day-session:last-child { border-bottom: none; }
+
+/* Cabecera de la sesión diaria (siempre visible) */
+.day-session-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; cursor: pointer; transition: background .15s;
+}
+.day-session-header:hover { background: #1c1c1c; }
+.day-session-header.active-day { background: #1a1800; }
+.ds-date   { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 600; color: var(--text-dim); min-width: 64px; flex-shrink: 0; }
+.ds-coins  { display: flex; align-items: center; gap: 5px; flex: 1; flex-wrap: wrap; }
+.ds-coin   { display: flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; }
+.ds-coin .coin-svg { width: 14px; height: 14px; }
+.ds-meta   { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+.ds-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.ds-toggle { font-size: 10px; color: var(--text-muted); background: none; border: 1px solid #2a2a2a; border-radius: 4px; padding: 2px 6px; cursor: pointer; transition: all .15s; font-family: 'Rajdhani', sans-serif; }
+.ds-toggle:hover { border-color: #555; color: var(--text); }
+.ds-del    { background: none; border: 1px solid #2a2a2a; color: var(--text-muted); border-radius: 4px; padding: 2px 7px; cursor: pointer; font-size: 11px; font-family: 'Rajdhani', sans-serif; transition: all .15s; }
+.ds-del:hover { border-color: var(--red); color: var(--red); }
+
+/* Panel expandible de cada sesión diaria con buffs */
+.day-session-detail {
+  display: none; padding: 0 16px 14px; flex-direction: column; gap: 10px;
+  border-top: 1px solid #1a1a1a;
+}
+.day-session-detail.open { display: flex; }
+
+/* Buffs integrados dentro del detalle de sesión diaria */
+.ds-buffs-title { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); padding-top: 8px; }
+.ds-buff-form {
+  display: grid; grid-template-columns: 1fr 100px 1fr auto; gap: 6px;
+  background: #191919; border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+}
+.ds-buff-form .buff-field label { font-size: 8px; }
+.ds-buff-add {
+  padding: 7px 12px; background: #1a2e1a; color: var(--green);
+  border: 1px solid #2a4a2a; border-radius: 6px;
+  font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+  transition: all .15s; white-space: nowrap; align-self: end;
+}
+.ds-buff-add:hover { background: #253525; border-color: #3a6a3a; }
+.ds-buff-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; }
+.ds-buff-list::-webkit-scrollbar { width: 3px; }
+.ds-buff-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+.ds-buff-item {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center;
+  padding: 6px 10px; background: #111; border-radius: 6px; border: 1px solid #1e1e1e;
+}
+.ds-buff-name  { font-size: 12px; font-weight: 600; color: var(--text); }
+.ds-buff-note-text { font-size: 10px; color: var(--text-muted); }
+.ds-buff-dmg   { font-size: 12px; font-weight: 700; color: var(--red); padding: 0 4px; }
+.ds-buff-del   { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 1px 3px; border-radius: 3px; transition: color .15s; }
+.ds-buff-del:hover { color: var(--red); }
+.ds-buff-empty { font-size: 11px; color: var(--text-muted); font-style: italic; text-align: center; padding: 10px 0; }
+
+/* Day block (label above sessions of a given date) */
+.day-block        { border-bottom: 1px solid #1a1a1a; }
+.day-block:last-child { border-bottom: none; }
+.day-block-label  {
+  padding: 8px 16px 4px; font-size: 10px; font-weight: 600;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.day-sess-count   { color: #3a3a3a; font-size: 9px; letter-spacing: 1px; }
+
+/* Resumen siempre visible dentro de cada sesión */
+.ds-summary { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 6px; }
+.ds-summary-row { display: flex; justify-content: space-between; align-items: center; }
+.ds-summary-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.ds-summary-val   { font-size: 13px; font-weight: 700; }
+.ds-summary-mobs-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
+.ds-mobs-list { display: flex; flex-direction: column; gap: 3px; max-height: 140px; overflow-y: auto; }
+.ds-mobs-list::-webkit-scrollbar { width: 3px; }
+.ds-mobs-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+.ds-mob-row   { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; background: #111; border-radius: 4px; }
+.ds-mob-name  { font-size: 12px; color: var(--text); }
+.ds-mob-count { font-size: 12px; font-weight: 700; color: var(--red); }
+.ds-mob-empty { font-size: 11px; color: var(--text-muted); font-style: italic; padding: 4px 0; }
+
+/* Modal actions: allow wrap for multiple session buttons */
+.modal-actions    { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.modal-btn small  { display: block; font-size: 9px; letter-spacing: .5px; opacity: .6; margin-top: 1px; }
+/* ══════════════════════════════════════════════
+   DEBUG & TOAST
+══════════════════════════════════════════════ */
+.debug-panel { background: #151515; border: 1px solid #2a2a2a; border-radius: 8px; padding: 10px 14px; margin-top: 8px; font-size: 11px; color: #555; font-family: monospace; max-height: 80px; overflow-y: auto; display: none; }
+.debug-panel.visible { display: block; }
+.toast {
+  position: fixed; bottom: 30px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #2a2a2a; border: 1px solid #444; color: var(--text);
+  padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  opacity: 0; transition: opacity .3s, transform .3s;
+  pointer-events: none; z-index: 9999; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ══════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════ */
+@media (max-width: 1000px) {
+  .main-grid { grid-template-columns: 1fr 1fr; }
+  .right-col { grid-column: 1 / -1; flex-direction: row; }
+  .fights-list-panel { flex: 1; }
+  .dmgcalc-body { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .right-col { flex-direction: column; }
+  .buff-form { grid-template-columns: 1fr 1fr; }
+  .buff-form .btn-add-buff { grid-column: 1 / -1; }
+  .session-stat-grid { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+  <div class="app-title">GrilloLootSystem</div>
+
+  <!-- ══════════════════════════════════════════
+       MAIN 3-COLUMN GRID
+  ══════════════════════════════════════════ -->
+  <div class="main-grid">
+
+    <!-- LEFT: Calendar + Log -->
+    <div class="left-col">
+      <div class="calendar-widget" id="calendarWidget"></div>
+      <div class="log-panel">
+        <div class="panel-label">Game Log</div>
+        <textarea id="logInput" placeholder="Paste your game chat log here..."></textarea>
+        <button class="btn-analyze" onclick="analyzeLog()">Analyze and Register Loot</button>
+        <button class="btn-clear"   onclick="clearLog()">Clear</button>
+        <div class="debug-panel" id="debugPanel"></div>
+      </div>
+    </div>
+
+    <!-- MIDDLE: Stats + Drops -->
+    <div class="mid-col">
+
+      <!-- Earned Money -->
+      <div class="stat-panel">
+        <div class="stat-label">Earned Money:</div>
+        <div class="money-row">
+          <!-- GOLD -->
+          <div class="money-item">
+            <svg class="coin-svg" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <defs><radialGradient id="gGold" cx="38%" cy="32%" r="62%">
+                <stop offset="0%"   stop-color="#ffe566"/>
+                <stop offset="55%"  stop-color="#f5a800"/>
+                <stop offset="100%" stop-color="#b87000"/>
+              </radialGradient></defs>
+              <circle cx="16" cy="16" r="15" fill="#8a5a00"/>
+              <circle cx="16" cy="16" r="13.5" fill="url(#gGold)"/>
+              <circle cx="16" cy="16" r="11.5" fill="none" stroke="#ffe040" stroke-width=".8" opacity=".5"/>
+              <polygon points="16,6.5 17.8,13 24.5,13 19,17 21,23.5 16,19.5 11,23.5 13,17 7.5,13 14.2,13" fill="#fff5a0" opacity=".95"/>
+            </svg>
+            <span class="money-val" id="goldVal">0</span>
+          </div>
+          <span class="money-sep">•</span>
+          <!-- SILVER -->
+          <div class="money-item">
+            <svg class="coin-svg" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <defs><radialGradient id="gSilver" cx="38%" cy="32%" r="62%">
+                <stop offset="0%"   stop-color="#eef4fa"/>
+                <stop offset="55%"  stop-color="#8aaabf"/>
+                <stop offset="100%" stop-color="#4a6878"/>
+              </radialGradient></defs>
+              <circle cx="16" cy="16" r="15" fill="#304858"/>
+              <circle cx="16" cy="16" r="13.5" fill="url(#gSilver)"/>
+              <circle cx="16" cy="16" r="11.5" fill="none" stroke="#c8dcee" stroke-width=".8" opacity=".5"/>
+              <path d="M16,7.5 L23,11 L23,17.5 C23,22 16,25.5 16,25.5 C16,25.5 9,22 9,17.5 L9,11 Z" fill="#ddeaf5" opacity=".88"/>
+              <path d="M16,10 L20.5,12.5 L20.5,17.5 C20.5,20.5 16,23 16,23 C16,23 11.5,20.5 11.5,17.5 L11.5,12.5 Z" fill="#8aaabf" opacity=".7"/>
+              <line x1="16" y1="10" x2="16" y2="23" stroke="#ddeaf5" stroke-width=".8" opacity=".5"/>
+              <line x1="11.5" y1="16" x2="20.5" y2="16" stroke="#ddeaf5" stroke-width=".8" opacity=".5"/>
+            </svg>
+            <span class="money-val" id="silverVal">0</span>
+          </div>
+          <span class="money-sep">•</span>
+          <!-- COPPER -->
+          <div class="money-item">
+            <svg class="coin-svg" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <defs><radialGradient id="gCopper" cx="38%" cy="32%" r="62%">
+                <stop offset="0%"   stop-color="#f0a868"/>
+                <stop offset="55%"  stop-color="#c06018"/>
+                <stop offset="100%" stop-color="#7a3208"/>
+              </radialGradient></defs>
+              <circle cx="16" cy="16" r="15" fill="#5a2008"/>
+              <circle cx="16" cy="16" r="13.5" fill="url(#gCopper)"/>
+              <circle cx="16" cy="16" r="11.5" fill="none" stroke="#e07830" stroke-width=".8" opacity=".5"/>
+              <path d="M11,9.5 L16.5,9.5 C21,9.5 24,12.2 24,16 C24,19.8 21,22.5 16.5,22.5 L11,22.5 Z
+                       M13.5,12 L16,12 C19.2,12 21.2,13.6 21.2,16 C21.2,18.4 19.2,20 16,20 L13.5,20 Z"
+                    fill="#f5c080" opacity=".92"/>
+            </svg>
+            <span class="money-val" id="copperVal">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time in fights -->
+      <div class="stat-panel">
+        <div class="stat-label">Time in fights:</div>
+        <div class="time-val" id="timeVal">0 h. 0 min. 0 sec.</div>
+      </div>
+
+      <!-- Unique mobs -->
+      <div class="unique-mobs-panel">
+        <div class="unique-mobs-left">
+          <div class="unique-mobs-label">Mobs asesinados diferentes</div>
+          <div class="unique-mobs-sub">mobs únicos detectados</div>
+        </div>
+        <div class="unique-mobs-val" id="uniqueMobsVal">0</div>
+      </div>
+
+      <!-- Drops -->
+      <div class="drops-panel">
+        <div class="drops-title">Drops</div>
+        <input type="text" class="drops-search" id="dropsSearch"
+               placeholder="Search drops..." oninput="renderDrops()">
+        <div class="drops-list" id="dropsList">
+          <div class="empty-msg">No drops recorded</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Fights -->
+    <div class="right-col">
+      <div class="fights-header-panel">
+        <div class="fights-label">List of fights:</div>
+        <div class="fights-count-badge" id="fightsCount">0</div>
+      </div>
+      <div class="fights-list-panel">
+        <div class="fights-list" id="fightsList">
+          <div class="empty-msg">No fights recorded</div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /main-grid -->
+
+  <!-- ══════════════════════════════════════════
+       CALCULADORA DE DAÑO
+  ══════════════════════════════════════════ -->
+  <div class="dmgcalc-panel">
+    <div class="dmgcalc-title">Calculadora de Daño</div>
+    <div class="dmgcalc-sub">Ingresá el golpe mínimo y máximo — los resultados se actualizan al instante</div>
+
+    <div class="dmgcalc-body">
+      <!-- Inputs -->
+      <div class="dmgcalc-inputs">
+        <div class="dmgcalc-field">
+          <label>Golpe Mínimo</label>
+          <input type="number" id="dmgMin" class="dmgcalc-number min-field"
+                 placeholder="0" min="0" oninput="calcDamage()">
+        </div>
+        <div class="dmgcalc-field">
+          <label>Golpe Máximo</label>
+          <input type="number" id="dmgMax" class="dmgcalc-number max-field"
+                 placeholder="0" min="0" oninput="calcDamage()">
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="dmgcalc-results">
+        <div class="dmgcalc-result-row">
+          <div class="dmgcalc-result-label">Daño Promedio</div>
+          <div class="dmgcalc-result-val hl" id="dmgAvg">—</div>
+        </div>
+        <hr class="dmgcalc-divider">
+        <div class="dmgcalc-result-row">
+          <div class="dmgcalc-result-label">Rango Completo</div>
+          <div class="dmgcalc-result-val" id="dmgRange" style="font-size:20px;color:var(--text-dim)">—</div>
+        </div>
+        <div class="dmgcalc-result-row">
+          <div class="dmgcalc-result-label">Amplitud (± desviación)</div>
+          <div class="dmgcalc-result-val" id="dmgSpread" style="font-size:18px;color:var(--text-dim)">—</div>
+        </div>
+        <div>
+          <div class="dmgcalc-result-label" style="margin-bottom:6px">Distribución Visual</div>
+          <div class="dmgcalc-range-bar">
+            <div class="dmgcalc-range-fill" id="dmgBar" style="width:0%"></div>
+          </div>
+          <div class="dmgcalc-range-labels">
+            <span id="dmgBarMin">Min</span>
+            <span style="color:#f5c842">▲ Promedio</span>
+            <span id="dmgBarMax">Max</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SESIÓN DIARIA
+  ══════════════════════════════════════════ -->
+  <div class="session-daily-panel">
+    <div class="session-daily-header">
+      <div class="session-daily-title">Sesión del Día</div>
+      <div class="session-daily-date" id="sessionDailyDate">—</div>
+    </div>
+
+    <!-- Solo pestaña Historial -->
+    <div class="session-tabs">
+      <button class="session-tab active" onclick="switchTab('history')">📋 Historial</button>
+    </div>
+
+    <!-- TAB: Historial -->
+    <div class="session-tab-content visible" id="tab-history">
+      <div class="session-history-list" id="sessionHistoryList">
+        <div class="empty-msg">No hay sesiones registradas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       RESUMEN MENSUAL
+  ══════════════════════════════════════════ -->
+  <div class="monthly-panel">
+    <div class="monthly-title">Resumen por Mes</div>
+    <div class="monthly-subtitle">Dinero total acumulado por mes</div>
+    <div class="monthly-grid" id="monthlyGrid">
+      <div class="empty-msg">No hay sesiones registradas</div>
+    </div>
+  </div>
+
+</div><!-- /app-wrapper -->
+<!-- MODAL: Confirmar análisis sobre sesión existente -->
+<div class="modal-overlay" id="analyzeModal">
+  <div class="modal-box">
+    <div class="modal-title">📋 Registrar Log</div>
+    <div class="modal-body" id="analyzeModalBody">
+      ¿Qué querés hacer con estos datos?
+    </div>
+    <div class="modal-actions" id="analyzeModalActions">
+      <button class="modal-btn secondary" onclick="cancelModal()">Cancelar</button>
+      <button class="modal-btn primary"   onclick="confirmNew()">＋ Nueva Sesión</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─────────────────────────────────
+   STATE
+   ─────────────────────────────────
+   sessions: { "YYYY-MM-DD": SessionObject[] }
+   SessionObject: {
+     id,          — unique string
+     num,         — display number (1, 2, 3…) within that date
+     gold, silver, copper,
+     fights,
+     mobs: {},
+     drops: [],
+     uniqueMobs,
+     buffs: []    — BuffObject[]
+   }
+   BuffObject: { id, name, dmg, note, ts }
+
+   selectedDate: "YYYY-MM-DD"
+   selectedSessId: string|null  — which session in that date is "active" in top panels
+───────────────────────────────── */
+let sessions      = {};   // { date: SessionObject[] }
+let selectedDate  = getTodayStr();
+let selectedSessId = null;  // id of the session shown in top panels
+let calYear       = new Date().getFullYear();
+let calMonth      = new Date().getMonth();
+
+/* ─────────────────────────────────
+   HELPERS
+───────────────────────────────── */
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function pad(n)  { return String(n).padStart(2,'0'); }
+function esc(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function uid()   { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+/** Returns sessions array for a date (never null). */
+function getSessions(ds) { return sessions[ds] || []; }
+
+/** Returns the next session number for a date. */
+function nextNum(ds) {
+  const arr = getSessions(ds);
+  return arr.length > 0 ? Math.max(...arr.map(s => s.num)) + 1 : 1;
+}
+
+/** Finds a session object by id within a date. */
+function findSess(ds, id) { return (sessions[ds]||[]).find(s => s.id === id) || null; }
+
+/* ─────────────────────────────────
+   PERSISTENCE
+───────────────────────────────── */
+function loadSessions() {
+  try {
+    const r = localStorage.getItem('grilloSessions');
+    if (r) {
+      const raw = JSON.parse(r);
+      // ── Migration: old format had plain objects per date, not arrays ──
+      sessions = {};
+      Object.entries(raw).forEach(([date, val]) => {
+        if (Array.isArray(val)) {
+          sessions[date] = val;
+        } else if (val && typeof val === 'object') {
+          // legacy single-session object → wrap in array
+          const migrated = { ...val, id: uid(), num: 1 };
+          if (!migrated.buffs) migrated.buffs = [];
+          sessions[date] = [migrated];
+        }
+      });
+    }
+  } catch(e) { sessions = {}; }
+}
+function saveSessions() {
+  try { localStorage.setItem('grilloSessions', JSON.stringify(sessions)); } catch(e) {}
+}
+
+/* ─────────────────────────────────
+   TOP-PANEL UI
+   Earned Money, Fights, Mobs únicos = SUMA de TODAS las sesiones del día.
+   Drops y List of Fights = acumulado de todas las sesiones.
+   selectedSessId se mantiene para saber qué sesión está "activa" en el tab Hoy.
+───────────────────────────────── */
+function loadSessionUI(ds, sessId) {
+  selectedDate = ds;
+
+  const arr = getSessions(ds);
+
+  // Actualizar selectedSessId si nos pasaron uno explícito
+  if (sessId !== undefined && sessId !== null) {
+    selectedSessId = String(sessId);
+  } else if (!arr.find(x => x.id === selectedSessId)) {
+    selectedSessId = arr.length > 0 ? arr[0].id : null;
+  }
+
+  // ── Sumar TODAS las sesiones del día ──
+  let totalGold = 0, totalSilver = 0, totalCopper = 0;
+  let totalFights = 0;
+  const totalMobs = {};   // mob → count acumulado
+  let anyFight = false;
+
+  arr.forEach(s => {
+    totalGold   += s.gold   || 0;
+    totalSilver += s.silver || 0;
+    totalCopper += s.copper || 0;
+    totalFights += s.fights || 0;
+    if (s.fights > 0) anyFight = true;
+    Object.entries(s.mobs || {}).forEach(([m, c]) => {
+      totalMobs[m] = (totalMobs[m] || 0) + c;
+    });
+  });
+
+  // Normalizar monedas sumadas
+  totalSilver += Math.floor(totalCopper / 100); totalCopper %= 100;
+  totalGold   += Math.floor(totalSilver / 100); totalSilver %= 100;
+
+  const totalUniqMobs = Object.keys(totalMobs).length;
+
+  // Paneles superiores con totales del día
+  document.getElementById('goldVal').textContent       = arr.length ? totalGold       : 0;
+  document.getElementById('silverVal').textContent     = arr.length ? totalSilver     : 0;
+  document.getElementById('copperVal').textContent     = arr.length ? totalCopper     : 0;
+  document.getElementById('timeVal').textContent       = anyFight
+                                                         ? '1 h. 0 min. 0 sec.'
+                                                         : '0 h. 0 min. 0 sec.';
+  document.getElementById('fightsCount').textContent   = arr.length ? totalFights     : 0;
+  document.getElementById('uniqueMobsVal').textContent = arr.length ? totalUniqMobs   : 0;
+
+  renderDrops();
+  renderFights();
+  renderTodayStats(ds);
+  updateDailyDateLabel(ds);
+}
+
+/* ─────────────────────────────────
+   DROPS — suma todas las sesiones del día
+───────────────────────────────── */
+function renderDrops() {
+  const el = document.getElementById('dropsList');
+  if (!el) return;
+  const q   = (document.getElementById('dropsSearch')||{value:''}).value.toLowerCase().trim();
+  const arr = getSessions(selectedDate);
+
+  // Acumular drops de todas las sesiones
+  const agg = {};
+  arr.forEach(s => {
+    (s.drops || []).forEach(d => { agg[d] = (agg[d]||0) + 1; });
+  });
+
+  if (!Object.keys(agg).length) {
+    el.innerHTML = '<div class="empty-msg">No drops recorded</div>';
+    return;
+  }
+
+  const entries = Object.entries(agg)
+    .filter(([n]) => !q || n.toLowerCase().includes(q))
+    .sort((a,b) => b[1] - a[1]);
+
+  el.innerHTML = entries.length
+    ? entries.map(([n,c]) =>
+        `<div class="drop-item"><span class="drop-name">${esc(n)}</span><span class="drop-qty">×${c}</span></div>`
+      ).join('')
+    : '<div class="empty-msg">No results</div>';
+}
+
+/* ─────────────────────────────────
+   FIGHTS — suma todas las sesiones del día
+───────────────────────────────── */
+function renderFights() {
+  const el = document.getElementById('fightsList');
+  if (!el) return;
+  const arr = getSessions(selectedDate);
+
+  // Acumular mobs de todas las sesiones
+  const totalMobs = {};
+  arr.forEach(s => {
+    Object.entries(s.mobs || {}).forEach(([m, c]) => {
+      totalMobs[m] = (totalMobs[m]||0) + c;
+    });
+  });
+
+  if (!Object.keys(totalMobs).length) {
+    el.innerHTML = '<div class="empty-msg">No fights recorded</div>';
+    return;
+  }
+
+  el.innerHTML = Object.entries(totalMobs)
+    .sort((a,b) => b[1] - a[1])
+    .map(([m,c]) =>
+      `<div class="fight-item"><span class="fight-mob">${esc(m)}</span><span class="fight-count">×${c}</span></div>`
+    ).join('');
+}
+
+/* ─────────────────────────────────
+   SESIÓN DIARIA — tab "Hoy"
+   Shows a summary card per session of the selected date.
+───────────────────────────────── */
+function updateDailyDateLabel(ds) {
+  const [y,m,d] = ds.split('-').map(Number);
+  const label   = `${MONTHS_ES[m-1]} ${d}, ${y}`;
+  document.getElementById('sessionDailyDate').textContent =
+    ds === TODAY_STR ? `Hoy — ${label}` : label;
+}
+
+function renderTodayStats(ds) {
+  const arr = getSessions(ds);
+  const el  = document.getElementById('todayStats');
+  if (!el) return;   // guard: elemento puede no existir aún
+
+  if (!arr.length) {
+    el.innerHTML = '<div class="empty-msg" style="grid-column:1/-1;padding:20px 0">Sin sesiones para este día</div>';
+    return;
+  }
+
+  el.innerHTML = arr.map(s => {
+    const isActive = s.id === selectedSessId;
+    return `
+      <div class="session-day-card${isActive?' sdc-active':''}"
+           data-date="${ds}" data-sessid="${s.id}"
+           onclick="handleSessClick(this)"
+           style="grid-column: 1 / -1;">
+        <div class="sdc-header">
+          <span class="sdc-num">Sesión #${s.num}</span>
+          ${isActive ? '<span class="sdc-badge">Activa</span>' : ''}
+        </div>
+        <div class="sdc-stats">
+          <div class="session-stat-card">
+            <div class="s-label">Fights</div>
+            <div class="s-val">${s.fights||0}</div>
+            <div class="s-sub">ataques</div>
+          </div>
+          <div class="session-stat-card">
+            <div class="s-label">Mobs únicos</div>
+            <div class="s-val" style="color:#c4a8ff">${s.uniqueMobs||0}</div>
+            <div class="s-sub">distintos</div>
+          </div>
+          <div class="session-stat-card">
+            <div class="s-label">Drops</div>
+            <div class="s-val" style="color:var(--gold)">${s.drops?s.drops.length:0}</div>
+            <div class="s-sub">items</div>
+          </div>
+          <div class="session-stat-card">
+            <div class="s-label">Oro</div>
+            <div class="s-val" style="color:#f5c842">${s.gold||0}</div>
+            <div class="s-sub">monedas</div>
+          </div>
+          <div class="session-stat-card">
+            <div class="s-label">Plata</div>
+            <div class="s-val" style="color:#c8d8e8">${s.silver||0}</div>
+            <div class="s-sub">monedas</div>
+          </div>
+          <div class="session-stat-card">
+            <div class="s-label">Cobre</div>
+            <div class="s-val" style="color:#e07830">${s.copper||0}</div>
+            <div class="s-sub">monedas</div>
+          </div>
+          <div class="session-stat-card">
+            <div class="s-label">Buffs</div>
+            <div class="s-val" style="color:var(--green)">${s.buffs?s.buffs.length:0}</div>
+            <div class="s-sub">registrados</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/**
+ * Lee data-date y data-sessid del elemento DOM (o su ancestro .day-session/.session-day-card)
+ * y llama selectSession con los valores reales del dataset — evita cualquier
+ * problema de encoding de strings en atributos onclick.
+ */
+function handleSessClick(el) {
+  const container = el.closest('[data-sessid]') || el;
+  const ds  = container.dataset.date;
+  const id  = container.dataset.sessid;
+  if (!ds || !id) return;
+  selectSession(ds, id);
+}
+
+/**
+ * Selects a session as active usando los valores leídos del DOM.
+ */
+function selectSession(ds, id) {
+  selectedDate   = String(ds);
+  selectedSessId = String(id);
+
+  // Los paneles superiores muestran el TOTAL del día — delegar a loadSessionUI
+  loadSessionUI(ds, id);
+
+  // Actualizar borde activo sin re-renderizar el historial completo
+  document.querySelectorAll('.day-session-header').forEach(el => {
+    el.classList.remove('active-day');
+  });
+  const activeContainer = document.querySelector(`[data-sessid="${id}"]`);
+  const activeHeader = activeContainer ? activeContainer.querySelector('.day-session-header') : null;
+  if (activeHeader) activeHeader.classList.add('active-day');
+}
+
+/* ─────────────────────────────────
+   CALENDAR
+───────────────────────────────── */
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DAYS_ES   = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const TODAY_STR = getTodayStr();
+
+function renderCalendar() {
+  const w      = document.getElementById('calendarWidget');
+  const first  = new Date(calYear, calMonth, 1).getDay();
+  const days   = new Date(calYear, calMonth+1, 0).getDate();
+  const prev   = new Date(calYear, calMonth,   0).getDate();
+
+  let h = `<div class="cal-header">
+    <button class="cal-nav" onclick="navCal(-12)" style="font-size:12px" title="Año ant.">«</button>
+    <button class="cal-nav" onclick="navCal(-1)"  title="Mes ant.">‹</button>
+    <div class="cal-title">${MONTHS_ES[calMonth]} ${calYear}</div>
+    <button class="cal-nav" onclick="navCal(1)"   title="Mes sig.">›</button>
+    <button class="cal-nav" onclick="navCal(12)"  style="font-size:12px" title="Año sig.">»</button>
+  </div><div class="cal-grid">`;
+
+  DAYS_ES.forEach((d,i) => {
+    h += `<div class="cal-dow ${i===0||i===6?'weekend':''}">${d}</div>`;
+  });
+
+  // prev-month padding
+  for (let i = first-1; i >= 0; i--) {
+    const day = prev - i;
+    const dow = new Date(calYear, calMonth-1, day).getDay();
+    h += `<div class="cal-day other-month${dow===0||dow===6?' sunday':''}"
+              onclick="selectDate(${calYear},${calMonth-1},${day})">${day}</div>`;
+  }
+
+  // current month days
+  for (let d = 1; d <= days; d++) {
+    const ds  = `${calYear}-${pad(calMonth+1)}-${pad(d)}`;
+    const dow = new Date(calYear, calMonth, d).getDay();
+    let cls   = 'cal-day';
+    if (dow===0 || dow===6) cls += ' sunday';
+    if (ds === selectedDate) cls += ' selected';
+    else if (ds === TODAY_STR) cls += ' today-marker';
+    if (sessions[ds] && sessions[ds].length > 0) cls += ' has-session';
+    h += `<div class="${cls}" onclick="selectDate(${calYear},${calMonth},${d})">${d}</div>`;
+  }
+
+  // next-month padding
+  const total = Math.ceil((first + days) / 7) * 7;
+  for (let nd = 1; nd <= total - first - days; nd++) {
+    const dow = new Date(calYear, calMonth+1, nd).getDay();
+    h += `<div class="cal-day other-month${dow===0||dow===6?' sunday':''}"
+              onclick="selectDate(${calYear},${calMonth+1},${nd})">${nd}</div>`;
+  }
+
+  w.innerHTML = h + '</div>';
+}
+
+function navCal(delta) {
+  calMonth += delta;
+  while (calMonth > 11) { calMonth -= 12; calYear++; }
+  while (calMonth < 0)  { calMonth += 12; calYear--; }
+  renderCalendar();
+}
+
+/**
+ * Selects a date (handles month overflow from prev/next padding clicks).
+ * Updates selectedDate, re-renders calendar and loads that day's data.
+ */
+function selectDate(y, m, d) {
+  const mo = ((m % 12) + 12) % 12;
+  const yr = y + Math.floor(m / 12);
+  selectedDate = `${yr}-${pad(mo+1)}-${pad(d)}`;
+  calYear = yr; calMonth = mo;
+  renderCalendar();
+  loadSessionUI(selectedDate);
+}
+
+/* ─────────────────────────────────
+   SESIÓN DIARIA — label de fecha
+───────────────────────────────── */
+function updateDailyDateLabel(ds) {
+  const el = document.getElementById('sessionDailyDate');
+  if (!el) return;
+  const [y,m,d] = ds.split('-').map(Number);
+  const label   = `${MONTHS_ES[m-1]} ${d}, ${y}`;
+  el.textContent = ds === TODAY_STR ? `Hoy — ${label}` : label;
+}
+
+/* ─────────────────────────────────
+   SESIÓN DIARIA — renderSessionHistory
+───────────────────────────────── */
+
+/**
+ * Renders the full history list grouped by month.
+ * Each month accordion shows days; each day can have multiple numbered sessions.
+ * Buffs are embedded inside each session's expandable detail panel.
+ */
+function renderSessionHistory() {
+  const el   = document.getElementById('sessionHistoryList');
+  if (!el) return;   // guard
+  const dates = Object.keys(sessions)
+    .filter(k => sessions[k] && sessions[k].length > 0)
+    .sort((a,b) => b.localeCompare(a));
+
+  if (!dates.length) {
+    el.innerHTML = '<div class="empty-msg">No hay sesiones registradas</div>';
+    return;
+  }
+
+  // ── Group dates by "YYYY-MM" ──
+  const monthMap = {};
+  dates.forEach(k => {
+    const ym = k.slice(0,7);
+    if (!monthMap[ym]) monthMap[ym] = [];
+    monthMap[ym].push(k);
+  });
+
+  el.innerHTML = Object.keys(monthMap).sort((a,b) => b.localeCompare(a)).map(ym => {
+    const [y, mo]  = ym.split('-').map(Number);
+    const dayDates = monthMap[ym];
+
+    // ── Month totals across ALL sessions of all days ──
+    let tGold = 0, tSilver = 0, tCopper = 0, tFights = 0, tDrops = 0, tSessions = 0;
+    dayDates.forEach(k => {
+      getSessions(k).forEach(s => {
+        tGold    += s.gold   || 0;
+        tSilver  += s.silver || 0;
+        tCopper  += s.copper || 0;
+        tFights  += s.fights || 0;
+        tDrops   += s.drops  ? s.drops.length : 0;
+        tSessions++;
+      });
+    });
+    tSilver += Math.floor(tCopper / 100); tCopper %= 100;
+    tGold   += Math.floor(tSilver / 100); tSilver %= 100;
+
+    const monthLabel    = `${MONTHS_ES[mo-1]} ${y}`;
+    const isCurrentMonth = ym === TODAY_STR.slice(0,7);
+
+    // ── Daily blocks ──
+    const dailyHTML = dayDates.map(k => {
+      const arr      = getSessions(k);
+      const [,, d]   = k.split('-').map(Number);
+      const isToday  = k === TODAY_STR;
+      const dayLabel = `${d < 10 ? '0'+d : d} ${MONTHS_ES[mo-1].slice(0,3)}`;
+
+      // ── Each numbered session under this day ──
+      const sessionsHTML = arr.map(s => {
+        const isActive  = s.id === selectedSessId && k === selectedDate;
+        const detailId  = `ds-detail-${s.id}`;
+        const bfNameId  = `bfn-${s.id}`;
+        const bfDmgId   = `bfd-${s.id}`;
+        const bfNoteId  = `bfnt-${s.id}`;
+        const bfListId  = `bfl-${s.id}`;
+        const buffsHTML = buildDayBuffListHTML(k, s.id, bfListId);
+
+        // Mobs list inside the session
+        const mobsHTML = s.mobs && Object.keys(s.mobs).length
+          ? Object.entries(s.mobs).sort((a,b) => b[1]-a[1]).map(([mob, cnt]) =>
+              `<div class="ds-mob-row">
+                 <span class="ds-mob-name">${esc(mob)}</span>
+                 <span class="ds-mob-count">×${cnt}</span>
+               </div>`).join('')
+          : '<span class="ds-mob-empty">Sin mobs registrados</span>';
+
+        // Crystals of Truth en esta sesión
+        const crystals = (s.drops || []).filter(d => d === 'Crystals of Truth').length;
+
+        return `
+          <div class="day-session" id="daysess-${s.id}" data-date="${k}" data-sessid="${s.id}">
+            <!-- Cabecera de sesión: número, monedas, meta, acciones -->
+            <div class="day-session-header${isActive?' active-day':''}"
+                 onclick="handleSessClick(this.closest('.day-session'))">
+              <span class="ds-date">#${s.num}</span>
+              <span class="ds-coins">
+                <span class="ds-coin">${C_GOLD}<span   style="color:#f5c842">${s.gold||0}</span></span>
+                <span style="color:var(--text-muted);font-size:10px">•</span>
+                <span class="ds-coin">${C_SILVER}<span style="color:#c8d8e8">${s.silver||0}</span></span>
+                <span style="color:var(--text-muted);font-size:10px">•</span>
+                <span class="ds-coin">${C_COPPER}<span style="color:#e07830">${s.copper||0}</span></span>
+              </span>
+              <span class="ds-meta">${s.fights||0}f · ${s.drops?s.drops.length:0}d · ${s.buffs?s.buffs.length:0}b</span>
+              <span class="ds-actions" onclick="event.stopPropagation()">
+                <button class="ds-toggle" onclick="toggleDayDetail('${detailId}', this)">⚡ Buffs ▾</button>
+                <button class="ds-del"    onclick="deleteOneSession('${k}','${s.id}')">✕</button>
+              </span>
+            </div>
+
+            <!-- Detalle siempre visible: fights + mobs + oro + crystals -->
+            <div class="ds-summary">
+              <div class="ds-summary-row">
+                <span class="ds-summary-label">Fights totales</span>
+                <span class="ds-summary-val" style="color:var(--red)">${s.fights||0}</span>
+              </div>
+              <div class="ds-summary-row">
+                <span class="ds-summary-label">Oro obtenido</span>
+                <span class="ds-summary-val" style="color:#f5c842">${s.gold||0}g ${s.silver||0}s ${s.copper||0}c</span>
+              </div>
+              <div class="ds-summary-row">
+                <span class="ds-summary-label">Crystals of Truth</span>
+                <span class="ds-summary-val" style="color:#7ec8e3">${crystals > 0 ? '×'+crystals : '—'}</span>
+              </div>
+              <div class="ds-summary-mobs-label">Mobs asesinados</div>
+              <div class="ds-mobs-list">${mobsHTML}</div>
+            </div>
+
+            <!-- Panel expandible: buffs -->
+            <div class="day-session-detail" id="${detailId}">
+              <div class="ds-buffs-title">⚡ Notas de Buff / Daño — ${dayLabel} Sesión #${s.num}</div>
+              <div class="ds-buff-form">
+                <div class="buff-field">
+                  <label>Nombre del Buff</label>
+                  <input type="text" id="${bfNameId}" class="buff-input" placeholder="Battle Cry, War Horn…">
+                </div>
+                <div class="buff-field">
+                  <label>Daño / Bonus</label>
+                  <input type="text" id="${bfDmgId}" class="buff-input" placeholder="+250, ×1.3">
+                </div>
+                <div class="buff-field">
+                  <label>Duración / Notas</label>
+                  <input type="text" id="${bfNoteId}" class="buff-input" placeholder="30 min, todo el día">
+                </div>
+                <button class="ds-buff-add"
+                  onclick="addDayBuff('${k}','${s.id}','${bfNameId}','${bfDmgId}','${bfNoteId}','${bfListId}')">
+                  ＋ Agregar
+                </button>
+              </div>
+              <div class="ds-buff-list" id="${bfListId}">${buffsHTML}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      return `
+        <div class="day-block">
+          <div class="day-block-label">${dayLabel}${isToday?' 🟢':''}
+            <span class="day-sess-count">${arr.length} sesión${arr.length!==1?'es':''}</span>
+          </div>
+          ${sessionsHTML}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="month-group">
+        <div class="month-group-header${isCurrentMonth?' expanded':''}"
+             onclick="toggleMonthGroup(this)">
+          <div class="mgh-left">
+            <span class="mgh-name">${monthLabel}</span>
+            <span class="mgh-total-coins">
+              <span class="mgh-coin">${C_GOLD}<span   style="color:#f5c842">${tGold}</span></span>
+              <span class="mgh-sep">•</span>
+              <span class="mgh-coin">${C_SILVER}<span style="color:#c8d8e8">${tSilver}</span></span>
+              <span class="mgh-sep">•</span>
+              <span class="mgh-coin">${C_COPPER}<span style="color:#e07830">${tCopper}</span></span>
+            </span>
+          </div>
+          <span class="mgh-meta">${tSessions} sesión${tSessions!==1?'es':''} · ${tFights}f · ${tDrops}d</span>
+          <span class="mgh-arrow${isCurrentMonth?' open':''}">▼</span>
+        </div>
+        <div class="month-days-container${isCurrentMonth?' open':''}">
+          ${dailyHTML}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/** Builds the inner HTML of the buff list for a specific session. */
+function buildDayBuffListHTML(ds, sessId, listId) {
+  const s = findSess(ds, sessId);
+  const buffs = (s && s.buffs) ? s.buffs : [];
+  if (!buffs.length) return '<div class="ds-buff-empty">Sin buffs registrados</div>';
+  return buffs.map(b => `
+    <div class="ds-buff-item" id="dsbi-${b.id}">
+      <div>
+        <div class="ds-buff-name">${esc(b.name)}</div>
+        ${b.note ? `<div class="ds-buff-note-text">⏱ ${esc(b.note)}</div>` : ''}
+      </div>
+      <div class="ds-buff-dmg">${b.dmg ? esc(b.dmg) : '—'}</div>
+      <button class="ds-buff-del"
+        onclick="deleteDayBuff('${ds}','${sessId}','${b.id}','${listId}')" title="Eliminar">✕</button>
+    </div>`).join('');
+}
+
+/** Toggle month group accordion. */
+function toggleMonthGroup(headerEl) {
+  const container = headerEl.nextElementSibling;
+  const arrow     = headerEl.querySelector('.mgh-arrow');
+  const isOpen    = container.classList.toggle('open');
+  arrow.classList.toggle('open', isOpen);
+  headerEl.classList.toggle('expanded', isOpen);
+}
+
+/** Toggle individual day session buff panel. */
+function toggleDayDetail(detailId, btnEl) {
+  const panel = document.getElementById(detailId);
+  if (!panel) return;
+  const isOpen = panel.classList.toggle('open');
+  btnEl.textContent = isOpen ? '⚡ Buffs ▴' : '⚡ Buffs ▾';
+}
+
+/**
+ * Adds a buff to a specific session by id within a date.
+ */
+function addDayBuff(ds, sessId, nameId, dmgId, noteId, listId) {
+  const nameEl = document.getElementById(nameId);
+  const dmgEl  = document.getElementById(dmgId);
+  const noteEl = document.getElementById(noteId);
+  if (!nameEl) { showToast('⚠️ Error: campo no encontrado'); return; }
+
+  const name = nameEl.value.trim();
+  const dmg  = dmgEl  ? dmgEl.value.trim()  : '';
+  const note = noteEl ? noteEl.value.trim() : '';
+  if (!name) { showToast('⚠️ Escribí el nombre del buff'); return; }
+
+  const s = findSess(ds, sessId);
+  if (!s) return;
+  if (!s.buffs) s.buffs = [];
+  s.buffs.push({ id: uid(), name, dmg, note, ts: Date.now() });
+  saveSessions();
+
+  const listEl = document.getElementById(listId);
+  if (listEl) listEl.innerHTML = buildDayBuffListHTML(ds, sessId, listId);
+
+  if (ds === selectedDate && sessId === selectedSessId) renderTodayStats(ds);
+
+  nameEl.value = '';
+  if (dmgEl)  dmgEl.value  = '';
+  if (noteEl) noteEl.value = '';
+  showToast(`⚡ Buff "${name}" registrado`);
+}
+
+/**
+ * Deletes a buff from a specific session.
+ */
+function deleteDayBuff(ds, sessId, buffId, listId) {
+  const s = findSess(ds, sessId);
+  if (!s || !s.buffs) return;
+  s.buffs = s.buffs.filter(b => b.id !== buffId);
+  saveSessions();
+
+  const listEl = document.getElementById(listId);
+  if (listEl) listEl.innerHTML = buildDayBuffListHTML(ds, sessId, listId);
+
+  if (ds === selectedDate && sessId === selectedSessId) renderTodayStats(ds);
+}
+
+/* ─────────────────────────────────
+   TAB SWITCHER
+───────────────────────────────── */
+function switchTab(name) {
+  const TAB_NAMES = ['today', 'history'];
+  document.querySelectorAll('.session-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', TAB_NAMES[i] === name);
+  });
+  document.querySelectorAll('.session-tab-content').forEach(el => el.classList.remove('visible'));
+  const t = document.getElementById(`tab-${name}`);
+  if (t) t.classList.add('visible');
+  if (name === 'history') renderSessionHistory();
+}
+
+/* ─────────────────────────────────
+   CALCULADORA DE DAÑO
+───────────────────────────────── */
+/**
+ * Reads dmgMin / dmgMax inputs and updates all result elements.
+ * Runs on every keystroke via oninput.
+ */
+function calcDamage() {
+  const rawMin = parseFloat(document.getElementById('dmgMin').value);
+  const rawMax = parseFloat(document.getElementById('dmgMax').value);
+
+  const avgEl    = document.getElementById('dmgAvg');
+  const rangeEl  = document.getElementById('dmgRange');
+  const spreadEl = document.getElementById('dmgSpread');
+  const barEl    = document.getElementById('dmgBar');
+  const barMinEl = document.getElementById('dmgBarMin');
+  const barMaxEl = document.getElementById('dmgBarMax');
+
+  // Nothing entered yet
+  if (isNaN(rawMin) && isNaN(rawMax)) {
+    [avgEl, rangeEl, spreadEl].forEach(e => e.textContent = '—');
+    barEl.style.width = '0%';
+    barMinEl.textContent = 'Min'; barMaxEl.textContent = 'Max';
+    return;
+  }
+
+  // Clamp: min ≥ 0, max ≥ min
+  const minVal = isNaN(rawMin) ? 0 : Math.max(0, rawMin);
+  const maxVal = isNaN(rawMax) ? minVal : Math.max(minVal, rawMax);
+  const avg    = (minVal + maxVal) / 2;
+  const spread = (maxVal - minVal) / 2;
+
+  // Format numbers: integers without decimals, floats with 1 decimal
+  const fmt = n => Number.isInteger(n) ? n.toLocaleString('es-AR') : n.toFixed(1);
+
+  avgEl.textContent    = fmt(avg);
+  rangeEl.textContent  = `${fmt(minVal)} – ${fmt(maxVal)}`;
+  spreadEl.textContent = `± ${fmt(spread)}`;
+  barMinEl.textContent = fmt(minVal);
+  barMaxEl.textContent = fmt(maxVal);
+  barEl.style.width    = maxVal > 0 ? '100%' : '0%';
+}
+
+/* ─────────────────────────────────
+   MONTHLY SUMMARY
+───────────────────────────────── */
+
+// Inline SVG coins — definidas aquí para que tanto renderMonthly como
+// renderSessionHistory puedan usarlas sin importar el orden de llamada.
+const C_GOLD   = `<svg class="coin-svg" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="jG" cx="38%" cy="32%" r="62%"><stop offset="0%" stop-color="#ffe566"/><stop offset="55%" stop-color="#f5a800"/><stop offset="100%" stop-color="#b87000"/></radialGradient></defs><circle cx="16" cy="16" r="15" fill="#8a5a00"/><circle cx="16" cy="16" r="13.5" fill="url(#jG)"/><polygon points="16,6.5 17.8,13 24.5,13 19,17 21,23.5 16,19.5 11,23.5 13,17 7.5,13 14.2,13" fill="#fff5a0" opacity=".95"/></svg>`;
+const C_SILVER = `<svg class="coin-svg" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="jS" cx="38%" cy="32%" r="62%"><stop offset="0%" stop-color="#eef4fa"/><stop offset="55%" stop-color="#8aaabf"/><stop offset="100%" stop-color="#4a6878"/></radialGradient></defs><circle cx="16" cy="16" r="15" fill="#304858"/><circle cx="16" cy="16" r="13.5" fill="url(#jS)"/><path d="M16,7.5 L23,11 L23,17.5 C23,22 16,25.5 16,25.5 C16,25.5 9,22 9,17.5 L9,11 Z" fill="#ddeaf5" opacity=".88"/></svg>`;
+const C_COPPER = `<svg class="coin-svg" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="jC" cx="38%" cy="32%" r="62%"><stop offset="0%" stop-color="#f0a868"/><stop offset="55%" stop-color="#c06018"/><stop offset="100%" stop-color="#7a3208"/></radialGradient></defs><circle cx="16" cy="16" r="15" fill="#5a2008"/><circle cx="16" cy="16" r="13.5" fill="url(#jC)"/><path d="M11,9.5 L16.5,9.5 C21,9.5 24,12.2 24,16 C24,19.8 21,22.5 16.5,22.5 L11,22.5 Z M13.5,12 L16,12 C19.2,12 21.2,13.6 21.2,16 C21.2,18.4 19.2,20 16,20 L13.5,20 Z" fill="#f5c080" opacity=".92"/></svg>`;
+
+function renderMonthly() {
+  const el    = document.getElementById('monthlyGrid');
+  const dates = Object.keys(sessions).filter(k => sessions[k] && sessions[k].length > 0);
+  if (!dates.length) {
+    el.innerHTML = '<div class="empty-msg">No hay sesiones registradas</div>';
+    return;
+  }
+
+  // Accumulate per "YYYY-MM" across ALL sessions of all days
+  const months = {};
+  dates.forEach(k => {
+    const ym = k.slice(0,7);
+    if (!months[ym]) months[ym] = { gold:0, silver:0, copper:0, sessions:0, fights:0, drops:0 };
+    getSessions(k).forEach(s => {
+      months[ym].gold    += s.gold    || 0;
+      months[ym].silver  += s.silver  || 0;
+      months[ym].copper  += s.copper  || 0;
+      months[ym].sessions++;
+      months[ym].fights  += s.fights  || 0;
+      months[ym].drops   += s.drops   ? s.drops.length : 0;
+    });
+  });
+
+  Object.values(months).forEach(m => {
+    m.silver += Math.floor(m.copper / 100); m.copper %= 100;
+    m.gold   += Math.floor(m.silver / 100); m.silver %= 100;
+  });
+
+  el.innerHTML = Object.keys(months).sort((a,b) => b.localeCompare(a)).map(ym => {
+    const [y, mo] = ym.split('-').map(Number);
+    const m       = months[ym];
+    return `<div class="monthly-card">
+      <div class="monthly-card-title">${MONTHS_ES[mo-1]} ${y}</div>
+      <div class="monthly-coins">
+        <span class="monthly-coin">${C_GOLD}<span   style="color:#f5c842">${m.gold}</span></span>
+        <span class="monthly-coin-sep">•</span>
+        <span class="monthly-coin">${C_SILVER}<span style="color:#c8d8e8">${m.silver}</span></span>
+        <span class="monthly-coin-sep">•</span>
+        <span class="monthly-coin">${C_COPPER}<span style="color:#e07830">${m.copper}</span></span>
+      </div>
+      <div class="monthly-meta">${m.sessions} sesión${m.sessions!==1?'es':''} · ${m.fights} fights · ${m.drops} drops</div>
+    </div>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────
+   NAVIGATION
+───────────────────────────────── */
+function jumpToDate(ds) {
+  const [y,m,d] = ds.split('-').map(Number);
+  calYear = y; calMonth = m-1; selectedDate = ds;
+  selectedSessId = null; // auto-pick first session of that date
+  renderCalendar();
+  loadSessionUI(ds, null);
+}
+
+/**
+ * Deletes ONE specific session by id within a date.
+ * If the date has no more sessions, removes the date key entirely.
+ */
+function deleteOneSession(ds, sessId) {
+  if (!confirm(`¿Eliminar esta sesión?`)) return;
+  if (!sessions[ds]) return;
+  sessions[ds] = sessions[ds].filter(s => s.id !== sessId);
+  if (sessions[ds].length === 0) delete sessions[ds];
+
+  // Re-number remaining sessions for that date
+  if (sessions[ds]) sessions[ds].forEach((s,i) => { s.num = i+1; });
+
+  if (selectedSessId === sessId) selectedSessId = null;
+  saveSessions();
+  renderCalendar();
+  renderMonthly();
+  const histTab = document.getElementById('tab-history');
+  if (histTab && histTab.classList.contains('visible')) renderSessionHistory();
+  if (selectedDate === ds) loadSessionUI(ds);
+}
+
+/* Legacy wrapper (called from old delete buttons, keep for safety) */
+function deleteSession(ds) { deleteOneSession(ds, selectedSessId); }
+
+/* ─────────────────────────────────
+   MODAL — multi-sesión
+   ─────────────────────────────────
+   _pendingAnalysis holds the parsed log data while the user decides.
+   The modal lets the user choose:
+     "Nueva sesión"         → create a brand-new numbered session for this date
+     "Agregar a sesión #N"  → merge data into an existing session
+───────────────────────────────── */
+let _pendingAnalysis = null;
+
+function closeModal() {
+  document.getElementById('analyzeModal').classList.remove('visible');
+  // NO nullificamos _pendingAnalysis aquí — lo hacen confirmNew/confirmMerge/cancelModal
+}
+
+function cancelModal() {
+  _pendingAnalysis = null;
+  document.getElementById('analyzeModal').classList.remove('visible');
+}
+
+/**
+ * Crea una sesión nueva numerada con los datos del log pendiente.
+ */
+function confirmNew() {
+  document.getElementById('analyzeModal').classList.remove('visible');
+  if (!_pendingAnalysis) return;
+  const { gold, silver, copper, fights, mobs, drops } = _pendingAnalysis;
+  _pendingAnalysis = null;
+
+  const uniqueMobs = Object.keys(mobs).length;
+  const num  = nextNum(selectedDate);
+  const sess = { id: uid(), num, gold, silver, copper, fights, mobs, drops, uniqueMobs, buffs: [] };
+  if (!sessions[selectedDate]) sessions[selectedDate] = [];
+  sessions[selectedDate].push(sess);
+  selectedSessId = sess.id;
+  _finishAnalyze(sess);
+}
+
+/**
+ * Agrega los datos del log pendiente a una sesión existente por id.
+ */
+function confirmMerge(sessId) {
+  document.getElementById('analyzeModal').classList.remove('visible');
+  if (!_pendingAnalysis) return;
+  const s = findSess(selectedDate, sessId);
+  if (!s) return;
+
+  const { gold, silver, copper, fights, mobs, drops } = _pendingAnalysis;
+  _pendingAnalysis = null;
+
+  s.gold   += gold;
+  s.silver += silver;
+  s.copper += copper;
+  // normalizar carry
+  s.silver += Math.floor(s.copper / 100); s.copper %= 100;
+  s.gold   += Math.floor(s.silver / 100); s.silver %= 100;
+  s.fights += fights;
+  Object.entries(mobs).forEach(([m,c]) => { s.mobs[m] = (s.mobs[m]||0) + c; });
+  if (!s.drops) s.drops = [];
+  s.drops.push(...drops);
+  s.uniqueMobs = Object.keys(s.mobs).length;
+
+  selectedSessId = sessId;
+  _finishAnalyze(s);
+}
+
+/** Finaliza y refresca la UI después de guardar. */
+function _finishAnalyze(s) {
+  saveSessions();
+  loadSessionUI(selectedDate, s.id);
+  renderCalendar();
+  renderMonthly();
+  const histTab = document.getElementById('tab-history');
+  if (histTab && histTab.classList.contains('visible')) renderSessionHistory();
+  showToast(`✓ Sesión #${s.num} · ${s.fights}f · ${s.uniqueMobs} mobs · ${s.gold}g ${s.silver}s ${s.copper}c`);
+}
+
+/* ─────────────────────────────────
+   LOG ANALYSIS
+───────────────────────────────── */
+function analyzeLog() {
+  const raw = document.getElementById('logInput').value;
+  if (!raw.trim()) { showToast('⚠️ Pegá el log primero'); return; }
+
+  const lines      = raw.split('\n');
+  let fights       = 0;
+  const mobs       = {};
+  const drops      = [];
+  let gold         = 0, silver = 0, copper = 0;
+  const debugLines = [];
+
+  lines.forEach(line => {
+    const t = line.trim();
+    if (!t) return;
+
+    // ── FIGHTS ──
+    // Formato: "You have attacked Mountain Roc [16] ." o "You have attacked Mob 16."
+    const atkM = t.match(/You have attacked (.+?)\s+\[?\d+\]?\s*\./);
+    if (atkM) {
+      fights++;
+      const mob = atkM[1].trim();
+      mobs[mob] = (mobs[mob]||0) + 1;
+      debugLines.push(`FIGHT: ${mob}`);
+      return;
+    }
+
+    // Ignorar líneas de inicio/fin de batalla
+    if (/The battle «/.test(t)) return;
+
+    // ── DROPS — "Received: Item N pcs." o "Item N pcs." ──
+    if (/\d+\s+pcs\.$/i.test(t)) {
+      // Quitar timestamp al inicio si existe: "12:34 " o "[12:34:56] "
+      let clean = t.replace(/^\[?[\d:]+\]?\s+/, '');
+      // Quitar prefijo "Received: "
+      clean = clean.replace(/^Received:\s*/i, '');
+      const pm = clean.match(/^(.+?)\s+(\d+)\s+pcs\.$/i);
+      if (pm) {
+        const itemName = pm[1].trim();
+        const qty      = parseInt(pm[2], 10);
+        for (let i = 0; i < qty; i++) drops.push(itemName);
+        debugLines.push(`DROP: ${itemName} ×${qty}`);
+      }
+      return;
+    }
+
+    // ── DROPS — "Crystals of Truth X" (sin pcs.) ──
+    const cotM = t.match(/Crystals of Truth\s+(\d+)/i);
+    if (cotM) {
+      const qty = parseInt(cotM[1], 10);
+      for (let i = 0; i < qty; i++) drops.push('Crystals of Truth');
+      debugLines.push(`DROP: Crystals of Truth ×${qty}`);
+      return;
+    }
+
+    // ── MONEY — ignorar loot de party ──
+    if (/Your party has found/i.test(t)) return;
+    if (/party.*received/i.test(t))      return;
+
+    // "You have received G S C." — 3 números = oro plata cobre
+    const recv3 = t.match(/[Yy]ou have received\s+(\d+)\s+(\d+)\s+(\d+)\s*\./);
+    if (recv3) {
+      gold   += parseInt(recv3[1], 10);
+      silver += parseInt(recv3[2], 10);
+      copper += parseInt(recv3[3], 10);
+      debugLines.push(`MONEY: ${recv3[1]}g ${recv3[2]}s ${recv3[3]}c`);
+      return;
+    }
+    // "You have received S C." — 2 números = plata cobre
+    const recv2 = t.match(/[Yy]ou have received\s+(\d+)\s+(\d+)\s*\./);
+    if (recv2) {
+      silver += parseInt(recv2[1], 10);
+      copper += parseInt(recv2[2], 10);
+      debugLines.push(`MONEY: 0g ${recv2[1]}s ${recv2[2]}c`);
+      return;
+    }
+    // "richer by G S C."
+    const rich3 = t.match(/richer by\s+(\d+)\s+(\d+)\s+(\d+)\s*\./);
+    if (rich3) {
+      gold   += parseInt(rich3[1], 10);
+      silver += parseInt(rich3[2], 10);
+      copper += parseInt(rich3[3], 10);
+      debugLines.push(`MAGIC: ${rich3[1]}g ${rich3[2]}s ${rich3[3]}c`);
+      return;
+    }
+    // "richer by S C."
+    const rich2 = t.match(/richer by\s+(\d+)\s+(\d+)\s*\./);
+    if (rich2) {
+      silver += parseInt(rich2[1], 10);
+      copper += parseInt(rich2[2], 10);
+      debugLines.push(`MAGIC: 0g ${rich2[1]}s ${rich2[2]}c`);
+      return;
+    }
+  });
+
+  // ── Normalizar carry de monedas ──
+  silver += Math.floor(copper / 100); copper %= 100;
+  gold   += Math.floor(silver / 100); silver %= 100;
+
+  // ── Mostrar debug brevemente ──
+  if (debugLines.length) {
+    const dbg = document.getElementById('debugPanel');
+    dbg.textContent = `[${debugLines.length} eventos] ` + debugLines.slice(0, 20).join(' | ');
+    dbg.classList.add('visible');
+    setTimeout(() => dbg.classList.remove('visible'), 10000);
+  }
+
+  // ── Guardar datos pendientes ──
+  _pendingAnalysis = { gold, silver, copper, fights, mobs, drops };
+
+  const existing  = getSessions(selectedDate);
+  const [y,mo,d]  = selectedDate.split('-').map(Number);
+  const dateLabel = `${MONTHS_ES[mo-1]} ${d}, ${y}`;
+
+  if (existing.length === 0) {
+    // Sin sesiones previas → guardar directamente como Sesión #1
+    confirmNew();
+    return;
+  }
+
+  // ── Construir modal con botones dinámicos ──
+  const sessButtons = existing.map(s =>
+    `<button class="modal-btn secondary" onclick="confirmMerge('${s.id}')">
+       Agregar a Sesión #${s.num}
+       <small>${s.gold}g ${s.silver}s · ${s.fights} fights</small>
+     </button>`
+  ).join('');
+
+  document.getElementById('analyzeModalBody').innerHTML =
+    `Fecha: <strong>${dateLabel}</strong> — ya hay <strong>${existing.length}</strong> sesión${existing.length !== 1 ? 'es' : ''}.<br>
+     <small style="color:var(--text-muted)">¿Dónde guardamos los datos del log?</small>`;
+
+  document.getElementById('analyzeModalActions').innerHTML =
+    `<button class="modal-btn secondary" onclick="cancelModal()">Cancelar</button>
+     ${sessButtons}
+     <button class="modal-btn primary" onclick="confirmNew()">＋ Nueva Sesión #${existing.length + 1}</button>`;
+
+  document.getElementById('analyzeModal').classList.add('visible');
+}
+
+function clearLog() { document.getElementById('logInput').value = ''; }
+
+/* ─────────────────────────────────
+   TOAST
+───────────────────────────────── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ─────────────────────────────────
+   INIT
+───────────────────────────────── */
+loadSessions();
+renderCalendar();
+loadSessionUI(selectedDate);
+renderMonthly();
+renderSessionHistory();   // pre-populate historial tab
+</script>
+</body>
+</html>
